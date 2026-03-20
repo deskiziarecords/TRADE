@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+  
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+
+  sentinel:
+    build: 
+      context: ..
+      dockerfile: docker/Dockerfile
+    depends_on:
+      - redis
+      - chromadb
+    environment:
+      - REDIS_HOST=redis
+      - CHROMA_HOST=chromadb
