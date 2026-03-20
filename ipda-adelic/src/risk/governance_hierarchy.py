@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """
 governance_hierarchy.py - Full Trading Governance Stack
 L0 Manual → L1 Mandra → L2 SOS27X → L3 Koopman → L4 Adelic → L5 UROL
