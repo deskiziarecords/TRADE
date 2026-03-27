@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEGIS/SOS-27-X: Global Market Operating System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-cyan: #00f3ff;
+            --neon-pink: #ff00ff;
+            --neon-amber: #ffaa00;
+            --dark-bg: #0a0a0f;
+            --panel-bg: rgba(15, 15, 25, 0.9);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--dark-bg);
+            color: #e0e0e0;
+            overflow-x: hidden;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Scanline effect */
+        .scanlines::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.1) 50%,
+                rgba(0,0,0,0.1)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* Glow effects */
+        .glow-cyan { box-shadow: 0 0 20px rgba(0, 243, 255, 0.3); }
+        .glow-pink { box-shadow: 0 0 20px rgba(255, 0, 255, 0.3); }
+        .glow-amber { box-shadow: 0 0 20px rgba(255, 170, 0, 0.3); }
+
+        .text-glow-cyan { text-shadow: 0 0 10px rgba(0, 243, 255, 0.8); }
+        .text-glow-pink { text-shadow: 0 0 10px rgba(255, 0, 255, 0.8); }
+
+        /* Grid background */
+        .grid-bg {
+            background-image: 
+                linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+
+        /* Layer cards */
+        .layer-card {
+            background: var(--panel-bg);
+            border: 1px solid rgba(0, 243, 255, 0.2);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .layer-card:hover {
+            border-color: var(--neon-cyan);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(0, 243, 255, 0.2);
+        }
+
+        .layer-card.active {
+            border-color: var(--neon-pink);
+            box-shadow: 0 0 30px rgba(255, 0, 255, 0.3);
+        }
+
+        /* Frequency indicators */
+        .freq-vl { border-left: 4px solid #4ade80; }
+        .freq-l { border-left: 4px solid #60a5fa; }
+        .freq-m { border-left: 4px solid #fbbf24; }
+        .freq-h { border-left: 4px solid #f87171; }
+        .freq-a { border-left: 4px solid #a855f7; }
+
+        /* Animated pulse */
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .animate-pulse-glow {
+            animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        /* Data stream */
+        .data-stream {
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0a0f;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #00f3ff;
+            border-radius: 4px;
+        }
+
+        /* Canvas container */
+        #manifold-canvas {
+            width: 100%;
+            height: 400px;
+            background: radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a0f 100%);
+        }
+
+        /* Terminal effect */
+        .terminal {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #333;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .terminal-line {
+            opacity: 0;
+            animation: fadeIn 0.3s forwards;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        /* Status indicators */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .status-active { background: #4ade80; box-shadow: 0 0 10px #4ade80; }
+        .status-warning { background: #fbbf24; box-shadow: 0 0 10px #fbbf24; }
+        .status-danger { background: #f87171; box-shadow: 0 0 10px #f87171; }
+        .status-stasis { background: #a855f7; box-shadow: 0 0 10px #a855f7; }
+
+        /* Phase visualization */
+        .phase-ring {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            border: 2px solid rgba(0, 243, 255, 0.3);
+        }
+
+        .phase-indicator {
+            position: absolute;
+            width: 4px;
+            height: 50%;
+            background: var(--neon-cyan);
+            transform-origin: bottom center;
+            left: 50%;
+            bottom: 50%;
+            transition: transform 0.5s ease;
+        }
+
+        /* Matrix rain effect */
+        .matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.03;
+            z-index: -1;
+        }
+    </style>
+<base target="_blank">
+</head>
+<body class="scanlines grid-bg min-h-screen">
+    <canvas id="matrixCanvas" class="matrix-bg"></canvas>
+
+    <!-- Header -->
+    <header class="fixed top-0 w-full z-50 bg-black/80 backdrop-blur-md border-b border-cyan-500/30">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <div class="w-3 h-3 bg-cyan-400 rounded-full animate-pulse"></div>
+                <h1 class="text-2xl font-bold tracking-wider text-glow-cyan">
+                    AEGIS<span class="text-pink-500">/</span>SOS-27-X
+                </h1>
+                <span class="mono text-xs text-gray-500 ml-2">GMOS v2.7.0 // PLATONIC_DIGITAL_QUEEN</span>
+            </div>
+            <div class="flex items-center gap-6 mono text-sm">
+                <div class="flex items-center gap-2">
+                    <span class="status-dot status-active"></span>
+                    <span class="text-green-400">SYSTEM ONLINE</span>
+                </div>
+                <div class="text-cyan-400" id="clock">00:00:00</div>
+            </div>
+        </div>
+    </header>
+
+    <main class="pt-24 pb-12 px-6 max-w-7xl mx-auto space-y-8">
+
+        <!-- Hero Section -->
+        <section class="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-slate-900/90 to-black/90 p-8">
+            <div class="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%2300f3ff\' fill-opacity=\'0.05\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-20"></div>
+
+            <div class="relative z-10 grid md:grid-cols-2 gap-8 items-center">
+                <div>
+                    <h2 class="text-4xl font-bold mb-4 text-glow-cyan">Global Market Operating System</h2>
+                    <p class="text-gray-400 text-lg mb-6 leading-relaxed">
+                        A six-layer computational architecture for navigating high-frequency market environments. 
+                        From the IPDA Compiler to Privileged Instructions—decode the hidden logic of institutional liquidity.
+                    </p>
+                    <div class="flex gap-4">
+                        <button onclick="scrollToLayers()" class="px-6 py-3 bg-cyan-500/20 border border-cyan-500 text-cyan-400 rounded hover:bg-cyan-500/30 transition-all mono text-sm">
+                            EXPLORE LAYERS
+                        </button>
+                        <button onclick="toggleSimulation()" class="px-6 py-3 bg-pink-500/20 border border-pink-500 text-pink-400 rounded hover:bg-pink-500/30 transition-all mono text-sm">
+                            RUN SIMULATION
+                        </button>
+                    </div>
+                </div>
+                <div class="relative h-64" id="manifold-container">
+                    <canvas id="manifold-canvas"></canvas>
+                    <div class="absolute bottom-4 left-4 mono text-xs text-cyan-400/60">
+                        ADELIC_MANIFOLD_VISUALIZATION // REAL_TIME
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- System Status Dashboard -->
+        <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-slate-900/80 border border-cyan-500/20 rounded-lg p-4">
+                <div class="text-xs text-gray-500 mono mb-1">SPECTRAL ALIGNMENT</div>
+                <div class="text-2xl font-bold text-cyan-400" id="spectral-status">COHERENT</div>
+                <div class="text-xs text-gray-600 mt-1">Phase Diff: <span id="phase-diff">0.23</span> rad</div>
+            </div>
+            <div class="bg-slate-900/80 border border-pink-500/20 rounded-lg p-4">
+                <div class="text-xs text-gray-500 mono mb-1">BAYESIAN PROB</div>
+                <div class="text-2xl font-bold text-pink-400" id="bayesian-prob">0.12</div>
+                <div class="text-xs text-gray-600 mt-1">P(Zt=1 | Λt)</div>
+            </div>
+            <div class="bg-slate-900/80 border border-amber-500/20 rounded-lg p-4">
+                <div class="text-xs text-gray-500 mono mb-1">GAMMA EXPOSURE</div>
+                <div class="text-2xl font-bold text-amber-400" id="gamma-exposure">LOW</div>
+                <div class="text-xs text-gray-600 mt-1">GEX: <span id="gex-value">-2.4</span>M</div>
+            </div>
+            <div class="bg-slate-900/80 border border-purple-500/20 rounded-lg p-4">
+                <div class="text-xs text-gray-500 mono mb-1">SYSTEM MODE</div>
+                <div class="text-2xl font-bold text-purple-400" id="system-mode">ACCUMULATION</div>
+                <div class="text-xs text-gray-600 mt-1">σ(t) = <span id="sigma-value">0</span></div>
+            </div>
+        </section>
+
+        <!-- Layer Architecture -->
+        <section id="layers-section" class="space-y-6">
+            <div class="flex items-center justify-between">
+                <h3 class="text-2xl font-bold text-glow-cyan">Six-Layer Architecture</h3>
+                <div class="flex gap-2">
+                    <button onclick="filterLayers('all')" class="px-3 py-1 text-xs border border-cyan-500/30 rounded hover:bg-cyan-500/20 transition">ALL</button>
+                    <button onclick="filterLayers('low')" class="px-3 py-1 text-xs border border-green-500/30 rounded hover:bg-green-500/20 transition">LOW FREQ</button>
+                    <button onclick="filterLayers('high')" class="px-3 py-1 text-xs border border-red-500/30 rounded hover:bg-red-500/20 transition">HIGH FREQ</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="layers-grid">
+                <!-- Layer 1: Compiler -->
+                <div class="layer-card freq-vl rounded-lg p-6" data-layer="1" data-freq="vl" onclick="selectLayer(1)">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="mono text-xs text-green-400">LAYER 01</span>
+                        <span class="mono text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">VL</span>
+                    </div>
+                    <h4 class="text-xl font-bold mb-2 text-white">The Compiler (IPDA)</h4>
+                    <p class="text-sm text-gray-400 mb-4">Defines valid address space using 20/40/60-day lookback ranges. Sets structural decision nodes and equilibrium points.</p>
+                    <div class="space-y-2 mono text-xs">
+                        <div class="flex justify-between"><span class="text-gray-500">Function:</span><span class="text-cyan-400">Range Validation</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Frequency:</span><span class="text-green-400">Days-Weeks</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">State:</span><span class="text-green-400 animate-pulse">ACTIVE</span></div>
+                    </div>
+                </div>
+
+                <!-- Layer 2: Memory -->
+                <div class="layer-card freq-l rounded-lg p-6" data-layer="2" data-freq="l" onclick="selectLayer(2)">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="mono text-xs text-blue-400">LAYER 02</span>
+                        <span class="mono text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">L</span>
+                    </div>
+                    <h4 class="text-xl font-bold mb-2 text-white">Memory (Dark Pools)</h4>
+                    <p class="text-sm text-gray-400 mb-4">Hidden state accumulation without slippage. Cumulative delta divergence and time-at-price consolidation.</p>
+                    <div class="space-y-2 mono text-xs">
+                        <div class="flex justify-between"><span class="text-gray-500">Function:</span><span class="text-cyan-400">Liquidity Storage</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Frequency:</span><span class="text-blue-400">Hours-Days</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">State:</span><span class="text-blue-400">ACCUMULATING</span></div>
+                    </div>
+                </div>
+
+                <!-- Layer 3: Interrupt -->
+                <div class="layer-card freq-l rounded-lg p-6" data-layer="3" data-freq="l" onclick="selectLayer(3)">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="mono text-xs text-blue-400">LAYER 03</span>
+                        <span class="mono text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">L</span>
+                    </div>
+                    <h4 class="text-xl font-bold mb-2 text-white">Interrupt (Macro News)</h4>
+                    <p class="text-sm text-gray-400 mb-4">Scheduled external triggers for state transitions. FOMC, NFP, geopolitical events inject volatility.</p>
+                    <div class="space-y-2 mono text-xs">
+                        <div class="flex justify-between"><span class="text-gray-500">Function:</span><span class="text-cyan-400">Volatility Injection</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Frequency:</span><span class="text-blue-400">Event-Driven</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Next:</span><span class="text-amber-400">48H ULTIMATUM</span></div>
+                    </div>
+                </div>
+
+                <!-- Layer 4: Garbage Collector -->
+                <div class="layer-card freq-m rounded-lg p-6" data-layer="4" data-freq="m" onclick="selectLayer(4)">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="mono text-xs text-amber-400">LAYER 04</span>
+                        <span class="mono text-xs bg-amber-500/20 text-amber-400 px-2 py-1 rounded">M</span>
+                    </div>
+                    <h4 class="text-xl font-bold mb-2 text-white">Garbage Collector</h4>
+                    <p class="text-sm text-gray-400 mb-4">Seek & Destroy operations. Sweeps retail stops to free liquidity. Equal highs/lows + stop cluster detection.</p>
+                    <div class="space-y-2 mono text-xs">
+                        <div class="flex justify-between"><span class="text-gray-500">Function:</span><span class="text-cyan-400">Liquidity Harvest</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Frequency:</span><span class="text-amber-400">Minutes-Hours</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Target:</span><span class="text-pink-400">1.1680 MAGNET</span></div>
+                    </div>
+                </div>
+
+                <!-- Layer 5: Amplifier -->
+                <div class="layer-card freq-h rounded-lg p-6" data-layer="5" data-freq="h" onclick="selectLayer(5)">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="mono text-xs text-red-400">LAYER 05</span>
+                        <span class="mono text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded">H</span>
+                    </div>
+                    <h4 class="text-xl font-bold mb-2 text-white">Amplifier (Gamma)</h4>
+                    <p class="text-sm text-gray-400 mb-4">Non-linear feedback via options dealer hedging. Creates momentum cascades and potential spectral inversion.</p>
+                    <div class="space-y-2 mono text-xs">
+                        <div class="flex justify-between"><span class="text-gray-500">Function:</span><span class="text-cyan-400">Feedback Loop</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Frequency:</span><span class="text-red-400">Seconds-Minutes</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Risk:</span><span class="text-red-400 animate-pulse">λ3 DETECTED</span></div>
+                    </div>
+                </div>
+
+                <!-- Layer 6: Privileged -->
+                <div class="layer-card freq-a rounded-lg p-6" data-layer="6" data-freq="a" onclick="selectLayer(6)">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="mono text-xs text-purple-400">LAYER 06</span>
+                        <span class="mono text-xs bg-purple-500/20 text-purple-400 px-2 py-1 rounded">A</span>
+                    </div>
+                    <h4 class="text-xl font-bold mb-2 text-white">Privileged Instruction</h4>
+                    <p class="text-sm text-gray-400 mb-4">Central Bank override. Unscheduled intervention forces total phase reset. Ultimate authority in the system.</p>
+                    <div class="space-y-2 mono text-xs">
+                        <div class="flex justify-between"><span class="text-gray-500">Function:</span><span class="text-cyan-400">System Override</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Frequency:</span><span class="text-purple-400">Aperiodic</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Status:</span><span class="text-gray-500">STANDBY</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Selected Layer Detail -->
+        <section id="layer-detail" class="hidden bg-slate-900/50 border border-cyan-500/20 rounded-lg p-6">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <h3 class="text-2xl font-bold text-glow-cyan mb-2" id="detail-title">Layer Detail</h3>
+                    <p class="text-gray-400" id="detail-desc">Select a layer to view detailed mechanics</p>
+                </div>
+                <button onclick="closeDetail()" class="text-gray-500 hover:text-white">✕</button>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="space-y-4">
+                    <div class="bg-black/40 rounded p-4 border border-gray-800">
+                        <h4 class="text-sm font-bold text-cyan-400 mb-2 mono">STATE VARIABLES</h4>
+                        <ul class="space-y-2 text-sm text-gray-300 mono" id="detail-variables">
+                        </ul>
+                    </div>
+                    <div class="bg-black/40 rounded p-4 border border-gray-800">
+                        <h4 class="text-sm font-bold text-pink-400 mb-2 mono">FAILURE MODES</h4>
+                        <ul class="space-y-2 text-sm text-gray-300" id="detail-failures">
+                        </ul>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <div class="bg-black/40 rounded p-4 border border-gray-800">
+                        <h4 class="text-sm font-bold text-amber-400 mb-2 mono">INTERACTION SIGNATURES</h4>
+                        <div class="space-y-2 text-sm" id="detail-interactions">
+                        </div>
+                    </div>
+                    <div class="bg-black/40 rounded p-4 border border-gray-800">
+                        <h4 class="text-sm font-bold text-green-400 mb-2 mono">CURRENT STATUS</h4>
+                        <div id="detail-status" class="mono text-sm text-gray-300">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- λ-Detector Suite -->
+        <section class="bg-slate-900/80 border border-pink-500/20 rounded-lg p-6">
+            <h3 class="text-2xl font-bold mb-6 text-glow-pink">λ-Detector Suite (The Keys)</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-black/40 rounded-lg p-4 border border-gray-800 hover:border-pink-500/50 transition cursor-pointer" onclick="toggleDetector('lambda1')">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="mono text-pink-400 font-bold">λ₁</span>
+                        <span class="status-dot status-active" id="dot-l1"></span>
+                    </div>
+                    <div class="text-sm font-semibold mb-1">State Persistence</div>
+                    <div class="text-xs text-gray-500">Phase state exceeds temporal bounds</div>
+                    <div class="mt-3 mono text-xs text-pink-400/60" id="status-l1">MONITORING</div>
+                </div>
+
+                <div class="bg-black/40 rounded-lg p-4 border border-gray-800 hover:border-pink-500/50 transition cursor-pointer" onclick="toggleDetector('lambda2')">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="mono text-pink-400 font-bold">λ₂</span>
+                        <span class="status-dot status-active" id="dot-l2"></span>
+                    </div>
+                    <div class="text-sm font-semibold mb-1">Temporal Inefficiency</div>
+                    <div class="text-xs text-gray-500">Killzone failure detection</div>
+                    <div class="mt-3 mono text-xs text-pink-400/60" id="status-l2">MONITORING</div>
+                </div>
+
+                <div class="bg-black/40 rounded-lg p-4 border border-gray-800 hover:border-pink-500/50 transition cursor-pointer" onclick="toggleDetector('lambda3')">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="mono text-pink-400 font-bold">λ₃</span>
+                        <span class="status-dot status-warning" id="dot-l3"></span>
+                    </div>
+                    <div class="text-sm font-semibold mb-1">Spectral Inversion</div>
+                    <div class="text-xs text-gray-500">Phase diff > π/2 (CRITICAL)</div>
+                    <div class="mt-3 mono text-xs text-amber-400 animate-pulse" id="status-l3">WARNING</div>
+                </div>
+
+                <div class="bg-black/40 rounded-lg p-4 border border-gray-800 hover:border-pink-500/50 transition cursor-pointer" onclick="toggleDetector('lambda6')">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="mono text-pink-400 font-bold">λ₆</span>
+                        <span class="status-dot status-active" id="dot-l6"></span>
+                    </div>
+                    <div class="text-sm font-semibold mb-1">Displacement Veto</div>
+                    <div class="text-xs text-gray-500">ATR-based move validation</div>
+                    <div class="mt-3 mono text-xs text-pink-400/60" id="status-l6">ARMED</div>
+                </div>
+            </div>
+
+            <!-- Phase Visualization -->
+            <div class="mt-6 flex justify-center">
+                <div class="relative">
+                    <div class="phase-ring" id="phase-ring">
+                        <div class="phase-indicator" id="compiler-phase" style="transform: rotate(0deg);"></div>
+                        <div class="phase-indicator" id="amplifier-phase" style="transform: rotate(45deg); background: var(--neon-pink); height: 40%;"></div>
+                    </div>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <div class="text-center">
+                            <div class="mono text-xs text-gray-500">PHASE DIFF</div>
+                            <div class="text-2xl font-bold text-pink-400" id="phase-display">π/4</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Causal Gate / Kill Switch -->
+        <section class="bg-gradient-to-r from-red-950/50 to-purple-950/50 border border-red-500/30 rounded-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-2xl font-bold text-glow-pink">AEGIS Causal Gate (Kill Switch)</h3>
+                <div class="flex items-center gap-2">
+                    <span class="mono text-xs text-gray-400">STATUS:</span>
+                    <span class="mono text-sm text-green-400 animate-pulse" id="gate-status">ARMED</span>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="bg-black/60 rounded p-4">
+                    <div class="text-xs text-gray-500 mono mb-2">CONTROL LAW</div>
+                    <div class="mono text-sm text-cyan-400">
+                        u<sub>t</sub>* = S<sub>t</sub> · (1 - λ₃) · 1[P(Z<sub>t</sub>=1|Λ<sub>t</sub>) < τ]
+                    </div>
+                    <div class="mt-3 text-xs text-gray-400">
+                        Modified control signal that zeros output if spectral inversion detected or Bayesian probability exceeds threshold.
+                    </div>
+                </div>
+
+                <div class="bg-black/60 rounded p-4">
+                    <div class="text-xs text-gray-500 mono mb-2">THRESHOLDS</div>
+                    <div class="space-y-2 mono text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">τ (Bayesian):</span>
+                            <span class="text-amber-400">0.75</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Phase Diff:</span>
+                            <span class="text-amber-400">π/2</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Current τ:</span>
+                            <span class="text-green-400" id="current-threshold">0.12</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-black/60 rounded p-4">
+                    <div class="text-xs text-gray-500 mono mb-2">EXECUTION LOG</div>
+                    <div class="terminal h-24 overflow-y-auto text-xs mono" id="execution-log">
+                        <div class="terminal-line text-green-400">> System initialized...</div>
+                        <div class="terminal-line text-cyan-400">> L1↔L5 interface active</div>
+                        <div class="terminal-line text-gray-400">> Monitoring EUR/USD 1.1680 magnet</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 flex gap-4">
+                <button onclick="triggerKillSwitch()" class="flex-1 py-3 bg-red-500/20 border border-red-500 text-red-400 rounded hover:bg-red-500/30 transition-all mono text-sm font-bold">
+                    TRIGGER MANUAL HALT
+                </button>
+                <button onclick="resetSystem()" class="flex-1 py-3 bg-cyan-500/20 border border-cyan-500 text-cyan-400 rounded hover:bg-cyan-500/30 transition-all mono text-sm font-bold">
+                    PHASE RESET (σ→0)
+                </button>
+            </div>
+        </section>
+
+        <!-- EUR/USD Operation Example -->
+        <section class="bg-slate-900/80 border border-cyan-500/20 rounded-lg p-6">
+            <h3 class="text-2xl font-bold mb-4 text-glow-cyan">Live Operation: EUR/USD Garbage Collector</h3>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <div class="bg-black/40 rounded p-4 mb-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="mono text-sm text-cyan-400">PRICE ACTION</span>
+                            <span class="mono text-xs text-gray-500">LIVE</span>
+                        </div>
+                        <div class="text-4xl font-bold text-white mb-2" id="eurusd-price">1.1629</div>
+                        <div class="flex gap-4 text-xs mono">
+                            <span class="text-green-400">▲ L20: 1.1590</span>
+                            <span class="text-amber-400">● L40: 1.1682</span>
+                            <span class="text-pink-400">▼ L60: 1.1419</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center p-2 bg-black/20 rounded">
+                            <span class="mono text-xs text-gray-400">Magnet Alpha (L40)</span>
+                            <span class="mono text-sm text-amber-400">1.1682</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2 bg-black/20 rounded">
+                            <span class="mono text-xs text-gray-400">Gamma Wall</span>
+                            <span class="mono text-sm text-pink-400">1.1712</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2 bg-black/20 rounded">
+                            <span class="mono text-xs text-gray-400">Mandra Gate</span>
+                            <span class="mono text-sm text-red-400">1.1750</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2 bg-black/20 rounded">
+                            <span class="mono text-xs text-gray-400">Gravity Target</span>
+                            <span class="mono text-sm text-cyan-400">1.1419</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <canvas id="operationChart" height="250"></canvas>
+                    <div class="mt-4 grid grid-cols-2 gap-2 text-xs mono">
+                        <div class="bg-green-500/10 border border-green-500/30 rounded p-2 text-center text-green-400">
+                            <div>LIQUIDITY</div>
+                            <div class="text-white font-bold">ACCUMULATING</div>
+                        </div>
+                        <div class="bg-amber-500/10 border border-amber-500/30 rounded p-2 text-center text-amber-400">
+                            <div>PHASE</div>
+                            <div class="text-white font-bold">MANIPULATION</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded">
+                <div class="flex items-start gap-3">
+                    <span class="text-2xl">⚠</span>
+                    <div>
+                        <div class="font-bold text-amber-400 mb-1">LIAR STATE DETECTED</div>
+                        <div class="text-sm text-gray-300">
+                            Current bounce to 1.1629 is Layer 4 (Garbage Collector) manipulation, not Layer 1 (Compiler) trend. 
+                            DXY strength confirms USD coherence while EUR shows incoherent state. System recommends STASIS until 1.1680 magnet test.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Terminal / Log -->
+        <section class="bg-black border border-gray-800 rounded-lg p-4 mono text-sm">
+            <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2">
+                <span class="text-cyan-400">SYSTEM_LOG // REAL_TIME</span>
+                <div class="flex gap-2">
+                    <button onclick="clearLog()" class="text-xs text-gray-500 hover:text-white">CLEAR</button>
+                    <button onclick="exportLog()" class="text-xs text-gray-500 hover:text-white">EXPORT</button>
+                </div>
+            </div>
+            <div id="system-log" class="h-48 overflow-y-auto space-y-1 text-xs">
+                <div class="text-gray-500">[2026-03-24 14:00:00] System initialization complete</div>
+                <div class="text-cyan-400">[2026-03-24 14:00:01] AEGIS kernel loaded</div>
+                <div class="text-cyan-400">[2026-03-24 14:00:02] IPDA Compiler: L60 range validated [1.1419 - 1.1950]</div>
+                <div class="text-amber-400">[2026-03-24 14:00:03] Layer 4 (Garbage Collector): Monitoring 1.1680 magnet</div>
+                <div class="text-pink-400">[2026-03-24 14:00:04] λ₃ detector: Phase difference 0.73 rad (WARNING)</div>
+                <div class="text-gray-400">[2026-03-24 14:00:05] OBNFE: P(Zt=1) = 0.12 [NORMAL]</div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // Clock
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent = now.toLocaleTimeString('en-US', {hour12: false});
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Matrix rain effect
+        const matrixCanvas = document.getElementById('matrixCanvas');
+        const matrixCtx = matrixCanvas.getContext('2d');
+        matrixCanvas.width = window.innerWidth;
+        matrixCanvas.height = window.innerHeight;
+
+        const chars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+        const charArray = chars.split('');
+        const fontSize = 14;
+        const columns = matrixCanvas.width / fontSize;
+        const drops = [];
+
+        for (let i = 0; i < columns; i++) {
+            drops[i] = Math.random() * -100;
+        }
+
+        function drawMatrix() {
+            matrixCtx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+            matrixCtx.fillStyle = '#00f3ff';
+            matrixCtx.font = fontSize + 'px monospace';
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = charArray[Math.floor(Math.random() * charArray.length)];
+                matrixCtx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+                if (drops[i] * fontSize > matrixCanvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+        setInterval(drawMatrix, 50);
+
+        // 3D Manifold Visualization
+        let scene, camera, renderer, manifold;
+        function initManifold() {
+            const container = document.getElementById('manifold-container');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, container.clientWidth / 400, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({canvas: document.getElementById('manifold-canvas'), alpha: true});
+            renderer.setSize(container.clientWidth, 400);
+
+            // Create manifold geometry
+            const geometry = new THREE.ParametricGeometry((u, v, target) => {
+                const x = (u - 0.5) * 4;
+                const z = (v - 0.5) * 4;
+                const y = Math.sin(x * 2) * Math.cos(z * 2) * 0.5 + Math.sin(Date.now() * 0.001 + x) * 0.1;
+                target.set(x, y, z);
+            }, 50, 50);
+
+            const material = new THREE.MeshBasicMaterial({
+                color: 0x00f3ff,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.3
+            });
+
+            manifold = new THREE.Mesh(geometry, material);
+            scene.add(manifold);
+
+            // Add points for "coherence"
+            const pointsGeometry = new THREE.BufferGeometry();
+            const pointsCount = 100;
+            const positions = new Float32Array(pointsCount * 3);
+
+            for (let i = 0; i < pointsCount * 3; i += 3) {
+                positions[i] = (Math.random() - 0.5) * 4;
+                positions[i + 1] = (Math.random() - 0.5) * 2;
+                positions[i + 2] = (Math.random() - 0.5) * 4;
+            }
+
+            pointsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const pointsMaterial = new THREE.PointsMaterial({color: 0xff00ff, size: 0.05});
+            const points = new THREE.Points(pointsGeometry, pointsMaterial);
+            scene.add(points);
+
+            camera.position.z = 5;
+            camera.position.y = 2;
+            camera.lookAt(0, 0, 0);
+
+            animateManifold();
+        }
+
+        function animateManifold() {
+            requestAnimationFrame(animateManifold);
+            manifold.rotation.y += 0.005;
+            manifold.rotation.x += 0.002;
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            if (camera && renderer) {
+                const container = document.getElementById('manifold-container');
+                camera.aspect = container.clientWidth / 400;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, 400);
+            }
+        });
+
+        initManifold();
+
+        // Layer selection
+        const layerData = {
+            1: {
+                title: "Layer 1: The Compiler (IPDA)",
+                desc: "The IPDA (Interbank Price Delivery Algorithm) Compiler defines the valid address space for price action. It operates on 20, 40, and 60-day lookback ranges to establish structural decision nodes.",
+                variables: ["Range boundaries (H20, L20, H40, L40, H60, L60)", "Equilibrium point (mean of ranges)", "Phase state (Accumulation/Manipulation/Distribution)", "Range validity flag"],
+                failures: ["Range invalidation: Price breaks all three levels simultaneously", "Stale ranges: Compiler hasn't updated in >60 days", "SEGFAULT: Layer 6 (Privileged) overrides all ranges"],
+                interactions: ["<span class='text-cyan-400'>→ All Layers:</span> Provides structural context", "<span class='text-pink-400'>← Layer 6:</span> Receives override signals", "<span class='text-amber-400'>↔ Layer 4:</span> Defines sweep boundaries"],
+                status: "ACTIVE // L60 Magnet: 1.1419"
+            },
+            2: {
+                title: "Layer 2: Memory (Dark Pools)",
+                desc: "Dark Pools and iceberg orders represent hidden state accumulation. This layer tracks cumulative delta divergence and time-at-price consolidation without moving the visible market.",
+                variables: ["Cumulative delta divergence", "Time-at-price density", "Hidden liquidity estimate", "Accumulation rate α(τ)"],
+                failures: ["Hidden state exposure: Gamma squeeze reveals accumulated positions", "Stale memory: Hidden state ages out without trigger", "Exhaustion: Collector consumes memory without phase transition"],
+                interactions: ["<span class='text-cyan-400'>→ Layer 4:</span> Provides target density", "<span class='text-pink-400'>→ Layer 5:</span> Accumulation fuels gamma", "<span class='text-amber-400'>← Layer 1:</span> Range boundaries define zones"],
+                status: "ACCUMULATING // H(t) increasing"
+            },
+            3: {
+                title: "Layer 3: Interrupt (Macro News)",
+                desc: "Scheduled external triggers that inject volatility and force state transitions. Includes FOMC (8x/year), NFP (monthly), and geopolitical events like the current 48-hour ultimatum.",
+                variables: ["Event type (rate/employment/inflation)", "Surprise magnitude (actual vs expected)", "Time since last interrupt", "Volatility impulse coefficient"],
+                failures: ["No interrupt when needed: Market drift", "Preemption: Layer 6 kills normal cycle", "False interrupt: Scheduled event has no impact"],
+                interactions: ["<span class='text-cyan-400'>→ All Layers:</span> Catalyst for transitions", "<span class='text-pink-400'>→ Layer 6:</span> Can trigger intervention", "<span class='text-amber-400'>→ Layer 5:</span> Ignites gamma hedging"],
+                status: "PENDING // 48H ULTIMATUM ACTIVE"
+            },
+            4: {
+                title: "Layer 4: Garbage Collector (Seek & Destroy)",
+                desc: "The institutional liquidity harvesting mechanism. Sweeps retail stop-loss clusters to free up liquidity for large players. Currently targeting 1.1680 magnet.",
+                variables: ["Sweep depth (distance beyond range)", "Return behavior (wick length)", "Volume profile during sweep", "Stop cluster density"],
+                failures: ["Runaway: No return inside range (becomes breakout)", "False sweep: No liquidity behind target", "Exhaustion: Collector consumes without trigger"],
+                interactions: ["<span class='text-cyan-400'>→ Layer 5:</span> Triggers gamma amplification", "<span class='text-pink-400'>← Layer 2:</span> Uses hidden liquidity targets", "<span class='text-amber-400'>← Layer 1:</span> Range boundaries set targets"],
+                status: "HUNTING // Target: 1.1680"
+            },
+            5: {
+                title: "Layer 5: Amplifier (Gamma Hedging)",
+                desc: "Non-linear feedback loop created by options dealer hedging. Can turn a simple sweep into a runaway breakout. Currently showing signs of spectral inversion (λ₃).",
+                variables: ["Gamma exposure (GEX)", "Dealer delta", "Strike clustering", "Amplification factor κ(t)"],
+                failures: ["Spectral inversion: Overrides compiler (λ₃)", "Control-induced instability", "Gamma squeeze: Feedback loop exponential"],
+                interactions: ["<span class='text-cyan-400'>→ Layer 1:</span> Can redefine ranges", "<span class='text-pink-400'>← Layer 4:</span> Sweeps trigger gamma", "<span class='text-amber-400'>↔ Layer 3:</span> Amplifies news impact"],
+                status: "WARNING // λ₃ DETECTED"
+            },
+            6: {
+                title: "Layer 6: Privileged Instruction (Central Banks)",
+                desc: "Ultimate system override. Central bank interventions force total phase resets. No failure mode—they are the authority. Currently in standby but monitoring Iran situation.",
+                variables: ["Intervention probability", "Policy regime (tightening/easing)", "Credibility delta", "Override flag"],
+                failures: ["None—ultimate authority", "Credibility crisis: Intervention ineffective", "Policy trap: No ammunition remaining"],
+                interactions: ["<span class='text-cyan-400'>→ All Layers:</span> Complete override", "<span class='text-pink-400'>← Layer 3:</span> Events can trigger", "<span class='text-amber-400'>← Layer 5:</span> Market conditions force action"],
+                status: "STANDBY // Monitoring"
+            }
+        };
+
+        function selectLayer(id) {
+            document.querySelectorAll('.layer-card').forEach(card => card.classList.remove('active'));
+            document.querySelector(`[data-layer="${id}"]`).classList.add('active');
+
+            const data = layerData[id];
+            document.getElementById('layer-detail').classList.remove('hidden');
+            document.getElementById('detail-title').textContent = data.title;
+            document.getElementById('detail-desc').textContent = data.desc;
+
+            document.getElementById('detail-variables').innerHTML = data.variables.map(v => `<li>• ${v}</li>`).join('');
+            document.getElementById('detail-failures').innerHTML = data.failures.map(f => `<li class="text-red-400">⚠ ${f}</li>`).join('');
+            document.getElementById('detail-interactions').innerHTML = data.interactions.map(i => `<div class="mb-1">${i}</div>`).join('');
+            document.getElementById('detail-status').innerHTML = `<span class="text-green-400">${data.status}</span>`;
+
+            document.getElementById('layer-detail').scrollIntoView({behavior: 'smooth'});
+        }
+
+        function closeDetail() {
+            document.getElementById('layer-detail').classList.add('hidden');
+            document.querySelectorAll('.layer-card').forEach(card => card.classList.remove('active'));
+        }
+
+        function filterLayers(freq) {
+            const cards = document.querySelectorAll('.layer-card');
+            cards.forEach(card => {
+                if (freq === 'all') {
+                    card.style.display = 'block';
+                } else if (freq === 'low' && (card.dataset.freq === 'vl' || card.dataset.freq === 'l')) {
+                    card.style.display = 'block';
+                } else if (freq === 'high' && (card.dataset.freq === 'm' || card.dataset.freq === 'h' || card.dataset.freq === 'a')) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        function scrollToLayers() {
+            document.getElementById('layers-section').scrollIntoView({behavior: 'smooth'});
+        }
+
+        // Simulation
+        let simulationRunning = false;
+        function toggleSimulation() {
+            simulationRunning = !simulationRunning;
+            if (simulationRunning) {
+                addLog('SIMULATION STARTED: Running L1↔L5 coupling test...', 'cyan');
+                runSimulation();
+            } else {
+                addLog('SIMULATION PAUSED', 'gray');
+            }
+        }
+
+        function runSimulation() {
+            if (!simulationRunning) return;
+
+            // Update phase
+            const phaseDiff = (Math.sin(Date.now() / 1000) + 1) * Math.PI / 2;
+            document.getElementById('phase-diff').textContent = phaseDiff.toFixed(2);
+            document.getElementById('compiler-phase').style.transform = `rotate(${phaseDiff * 57.29}deg)`;
+            document.getElementById('amplifier-phase').style.transform = `rotate(${phaseDiff * 57.29 + 90}deg)`;
+            document.getElementById('phase-display').textContent = (phaseDiff > Math.PI/2 ? 'π/2+' : `${(phaseDiff).toFixed(2)} rad`);
+
+            // Update λ₃ status
+            if (phaseDiff > Math.PI/2) {
+                document.getElementById('dot-l3').className = 'status-dot status-danger';
+                document.getElementById('status-l3').textContent = 'INVERSION!';
+                document.getElementById('status-l3').className = 'mt-3 mono text-xs text-red-400 animate-pulse';
+                document.getElementById('spectral-status').textContent = 'INVERTED';
+                document.getElementById('spectral-status').className = 'text-2xl font-bold text-red-400 animate-pulse';
+            } else {
+                document.getElementById('dot-l3').className = 'status-dot status-warning';
+                document.getElementById('status-l3').textContent = 'WARNING';
+                document.getElementById('status-l3').className = 'mt-3 mono text-xs text-amber-400';
+                document.getElementById('spectral-status').textContent = 'COHERENT';
+                document.getElementById('spectral-status').className = 'text-2xl font-bold text-cyan-400';
+            }
+
+            // Update price
+            const basePrice = 1.1629;
+            const noise = (Math.random() - 0.5) * 0.002;
+            document.getElementById('eurusd-price').textContent = (basePrice + noise).toFixed(4);
+
+            setTimeout(runSimulation, 100);
+        }
+
+        // Kill Switch
+        function triggerKillSwitch() {
+            addLog('MANUAL HALT TRIGGERED', 'red');
+            document.getElementById('gate-status').textContent = 'HALTED';
+            document.getElementById('gate-status').className = 'mono text-sm text-red-400 animate-pulse';
+            document.getElementById('system-mode').textContent = 'STASIS';
+            document.getElementById('system-mode').className = 'text-2xl font-bold text-purple-400 animate-pulse';
+            document.getElementById('sigma-value').textContent = '0';
+
+            // Add to execution log
+            const log = document.getElementById('execution-log');
+            const entry = document.createElement('div');
+            entry.className = 'terminal-line text-red-400';
+            entry.textContent = `> KILL SWITCH ACTIVATED [${new Date().toLocaleTimeString()}]`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function resetSystem() {
+            addLog('PHASE RESET INITIATED (σ→0)', 'cyan');
+            document.getElementById('gate-status').textContent = 'ARMED';
+            document.getElementById('gate-status').className = 'mono text-sm text-green-400 animate-pulse';
+            document.getElementById('system-mode').textContent = 'ACCUMULATION';
+            document.getElementById('system-mode').className = 'text-2xl font-bold text-purple-400';
+            document.getElementById('sigma-value').textContent = '0';
+
+            const log = document.getElementById('execution-log');
+            const entry = document.createElement('div');
+            entry.className = 'terminal-line text-cyan-400';
+            entry.textContent = `> PHASE RESET COMPLETE [${new Date().toLocaleTimeString()}]`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // Detector toggles
+        function toggleDetector(id) {
+            const dot = document.getElementById(`dot-${id.replace('lambda', 'l')}`);
+            const status = document.getElementById(`status-${id.replace('lambda', 'l')}`);
+
+            if (dot.classList.contains('status-active')) {
+                dot.className = 'status-dot status-stasis';
+                status.textContent = 'DISABLED';
+                status.className = 'mt-3 mono text-xs text-purple-400';
+            } else {
+                dot.className = 'status-dot status-active';
+                status.textContent = 'MONITORING';
+                status.className = 'mt-3 mono text-xs text-pink-400/60';
+            }
+        }
+
+        // Logging
+        function addLog(message, color = 'gray') {
+            const log = document.getElementById('system-log');
+            const entry = document.createElement('div');
+            const time = new Date().toLocaleTimeString('en-US', {hour12: false});
+            entry.className = `text-${color}-400`;
+            entry.textContent = `[2026-03-24 ${time}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('system-log').innerHTML = '';
+        }
+
+        function exportLog() {
+            const log = document.getElementById('system-log').innerText;
+            const blob = new Blob([log], {type: 'text/plain'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'aegis_log.txt';
+            a.click();
+        }
+
+        // Chart.js for operation visualization
+        const ctx = document.getElementById('operationChart').getContext('2d');
+        const operationChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['1.1400', '1.1450', '1.1500', '1.1550', '1.1600', '1.1650', '1.1700', '1.1750'],
+                datasets: [{
+                    label: 'Price',
+                    data: [1.1420, 1.1480, 1.1520, 1.1580, 1.1629, 1.1650, 1.1680, 1.1710],
+                    borderColor: '#00f3ff',
+                    backgroundColor: 'rgba(0, 243, 255, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }, {
+                    label: 'L40 Magnet',
+                    data: [1.1682, 1.1682, 1.1682, 1.1682, 1.1682, 1.1682, 1.1682, 1.1682],
+                    borderColor: '#fbbf24',
+                    borderDash: [5, 5],
+                    pointRadius: 0
+                }, {
+                    label: 'L60 Target',
+                    data: [1.1419, 1.1419, 1.1419, 1.1419, 1.1419, 1.1419, 1.1419, 1.1419],
+                    borderColor: '#ff00ff',
+                    borderDash: [2, 2],
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}}
+                    }
+                },
+                scales: {
+                    y: {
+                        grid: {color: 'rgba(255, 255, 255, 0.05)'},
+                        ticks: {color: '#6b7280', font: {family: 'JetBrains Mono'}}
+                    },
+                    x: {
+                        grid: {color: 'rgba(255, 255, 255, 0.05)'},
+                        ticks: {color: '#6b7280', font: {family: 'JetBrains Mono'}}
+                    }
+                }
+            }
+        });
+
+        // Random updates
+        setInterval(() => {
+            if (Math.random() > 0.7) {
+                const messages = [
+                    {text: 'Layer 4: Sweep detected at 1.1675', color: 'amber'},
+                    {text: 'OBNFE: Updating P(Zt=1)...', color: 'gray'},
+                    {text: 'Gamma: GEX increasing +12%', color: 'pink'},
+                    {text: 'DXY: Breaking 100.00 resistance', color: 'cyan'},
+                    {text: 'λ₆: Displacement validated', color: 'green'}
+                ];
+                const msg = messages[Math.floor(Math.random() * messages.length)];
+                addLog(msg.text, msg.color);
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
