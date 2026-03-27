@@ -1,0 +1,42 @@
+[package]
+name = "fix_encoder"
+version = "0.1.0"
+edition = "2021"
+authors = ["RPD Systems"]
+rust-version = "1.77"
+
+[dependencies]
+# SIMD
+packed_simd_2 = "0.3"
+wide = "0.7"
+
+# Async
+tokio = { version = "1.36", features = ["net", "io-util", "rt"] }
+
+# Buffer management
+bytes = "1.5"
+byteorder = "1.5"
+
+# Time (no std for speed)
+time = { version = "0.3", default-features = false, features = ["formatting"] }
+
+# Tracing
+tracing = "0.1"
+
+# No-std compatible
+heapless = "0.8"  # Fixed-capacity vectors
+
+[dev-dependencies]
+criterion = "0.5"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+target-cpu = "native"
+
+[profile.bench]
+inherits = "release"
+debug = true
