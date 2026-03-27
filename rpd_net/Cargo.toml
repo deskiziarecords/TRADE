@@ -1,0 +1,54 @@
+[package]
+name = "rpd_net"
+version = "0.1.0"
+edition = "2021"
+authors = ["RPD Systems"]
+rust-version = "1.77"
+
+[dependencies]
+# io_uring (Linux 5.15+)
+io-uring = { version = "0.6", features = ["unstable"] }
+tokio-uring = "0.5"
+
+# Tokio with specific features
+tokio = { version = "1.36", features = [
+    "rt-multi-thread",
+    "net",
+    "time",
+    "macros",
+    "sync",
+    "parking_lot",
+] }
+
+# Lock-free structures
+crossbeam = "0.8"
+crossbeam-queue = "0.3"
+cache-padded = "1.3"
+
+# Memory
+memmap2 = "0.9"
+libc = "0.2"
+
+# NIC control
+ethtool = "0.2"  # For ring buffer tuning
+
+# Time
+time = { version = "0.3", features = ["formatting"] }
+
+# Tracing
+tracing = "0.1"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+target-cpu = "native"
+
+[profile.bench]
+inherits = "release"
+debug = true
