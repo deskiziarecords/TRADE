@@ -1,0 +1,61 @@
+[package]
+name = "rpd_executor"
+version = "0.1.0"
+edition = "2021"
+authors = ["RPD Systems"]
+rust-version = "1.77"
+
+[[bin]]
+name = "rpd-executor"
+path = "src/main.rs"
+
+[dependencies]
+# Internal crates
+schur_engine = { path = "../schur_engine" }
+fix_encoder = { path = "../fix_encoder" }
+rpd_net = { path = "../rpd_net" }
+
+# Async runtime
+tokio = { version = "1.36", features = [
+    "rt-multi-thread",
+    "macros",
+    "sync",
+    "time",
+    "signal",
+    "parking_lot",
+] }
+
+# Futures
+futures = "0.3"
+futures-channel = "0.3"
+
+# Lock-free structures
+crossbeam = "0.8"
+crossbeam-queue = "0.3"
+parking_lot = "0.12"
+
+# Time
+tokio-time = "0.2"
+quanta = "0.12"           # Fast monotonic clock
+
+# Tracing/metrics
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+metrics = "0.22"
+metrics-exporter-prometheus = "0.13"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+target-cpu = "native"
