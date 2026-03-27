@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "hyperion/fix-encoder",
+    "hyperion/rpd_net",
+    "hyperion/rpd_executor",
+    "hyperion/schur_engine",
+    "hyperion/ev-atr",
+    "hyperion/schur",
+]
+resolver = "2"
