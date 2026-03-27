@@ -1,0 +1,175 @@
+// ------------------------------------------------------------
+// Cargo.toml
+// ------------------------------------------------------------
+// [package]
+// name = "ev_atr_confluence"
+// version = "0.1.0"
+// edition = "2021"
+//
+// [dependencies]
+// # No external crates are required for this demo.
+// ------------------------------------------------------------
+
+use std::f64;
+
+/// -----------------------------------------------------------
+/// 1️⃣ Kelly‑adjusted EV weight
+///    $f_{\text{Kelly}}(EV_t)=\lambda_{\text{frac}}\;
+///    \dfrac{\text{AvgWin}\times\text{AvgLoss}}{EV_t}\;
+///    \mathbf{1}\!\left[EV_t>0\right]$
+/// -----------------------------------------------------------
+fn f_kelly(lambda_frac: f64, avg_win: f64, avg_loss: f64, ev_t: f64) -> f64 {
+    if ev_t <= 0.0 {
+        0.0
+    } else {
+        lambda_frac * (avg_win * avg_loss) / ev_t
+    }
+}
+
+/// -----------------------------------------------------------
+/// 2️⃣ Volatility attenuation
+///    Two equivalent forms are used in the literature.
+///    The example you gave corresponds to the *inverse* form:
+///    $$
+///    g_{\text{vol}}(ATR_t)=
+///    \begin{cases}
+///        1, & ATR_t\le ATR_{\text{ref}}\\[4pt]
+///        \left(\dfrac{ATR_{\text{ref}}}{ATR_t}\right)^{\beta_{\text{vol}}}, & ATR_t> ATR_{\text{ref}}
+///    \end{cases}
+///    $$
+///    (size is shrunk when volatility spikes).
+/// -----------------------------------------------------------
+fn g_vol(atr_t: f64, atr_ref: f64, beta_vol: f64) -> f64 {
+    if atr_t <= atr_ref {
+        1.0
+    } else {
+        (atr_ref / atr_t).powf(beta_vol)
+    }
+}
+
+/// -----------------------------------------------------------
+/// 3️⃣ Confluence modulation
+///    $h_{\text{conf}}(\phi_t)=\phi_t^{\alpha_{\phi}}\;
+///    \mathbf{1}\!\left[\phi_t>\phi_{\min}\right]$
+/// -----------------------------------------------------------
+fn h_conf(phi_t: f64, alpha_phi: f64, phi_min: f64) -> f64 {
+    if phi_t <= phi_min {
+        0.0    } else {
+        phi_t.powf(alpha_phi)
+    }
+}
+
+/// -----------------------------------------------------------
+/// 4️⃣ Maximum capital at risk
+///    $C_{\max}= \min\bigl(f_{\text{risk}}\cdot\text{Equity},
+///                       L_{\max}\cdot\text{Equity}\bigr)$
+/// -----------------------------------------------------------
+fn c_max(frisk: f64, lmax: f64, equity: f64) -> f64 {
+    (frisk * equity).min(lmax * equity)
+}
+
+/// -----------------------------------------------------------
+/// Core position‑size (risk) formula///    $Q_t = f_{\text{Kelly}}(EV_t)\;
+///           g_{\text{vol}}(ATR_t)\;
+///           h_{\text{conf}}(\phi_t)\;
+///           C_{\max}$
+/// -----------------------------------------------------------
+fn position_size_risk(
+    lambda_frac: f64,
+    avg_win: f64,
+    avg_loss: f64,
+    ev_t: f64,
+    atr_t: f64,
+    atr_ref: f64,
+    beta_vol: f64,
+    phi_t: f64,
+    alpha_phi: f64,
+    phi_min: f64,
+    frisk: f64,
+    lmax: f64,
+    equity: f64,
+) -> f64 {
+    let fkelly = f_kelly(lambda_frac, avg_win, avg_loss, ev_t);
+    let gvol = g_vol(atr_t, atr_ref, beta_vol);
+    let hconf = h_conf(phi_t, alpha_phi, phi_min);
+    let cmax = c_max(frisk, lmax, equity);
+
+    fkelly * gvol * hconf * cmax}
+
+/// -----------------------------------------------------------
+/// Helper: convert a risk amount (dollars) to a notional position size
+///    $\text{Notional}= \dfrac{Q_t}{\text{stop\_fraction}}$
+///    where `stop_fraction` is the fractional stop‑loss (e.g. 0.005 for 0.5%).
+/// -----------------------------------------------------------
+fn notional_from_risk(risk_amount: f64, stop_fraction: f64) -> f64 {
+    risk_amount / stop_fraction
+}
+
+/// -----------------------------------------------------------
+/// Demo – reproduces the numbers from your verification
+/// -----------------------------------------------------------
+fn main() {
+    // ----- Input parameters (as in the example) -----
+    let equity: f64 = 100_000.0;          // $100,000
+    let ev_t: f64 = 0.0114;              // 1.14 %  (as decimal)
+    let atr_t: f64 = 0.008;              // 0.8 %  (elevated)
+    let atr_ref: f64 = 0.005;            // 0.5 %  (baseline)
+    let phi_t: f64 = 0.75;               // confluence score    // Kelly‑type parameters
+    let lambda_frac: f64 = 3.0;          // fractional Kelly safety
+    let avg_win: f64 = 0.015;            // 1.5 %  (example)
+    let avg_loss: f64 = 0.005;           // 0.5 %  (example)
+
+    // Volatility & confluence parameters    let beta_vol: f64 = 0.5;             // attenuation steepness    let alpha_phi: f64 = 1.5;            // confluence sensitivity    let phi_min: f64 = 0.60;             // minimum viable signal
+
+    // Risk‑management parameters
+    let frisk: f64 = 0.01;               // 1 % risk per trade
+    let lmax: f64 = 50.0;                // 50× max leverage (not hit here)
+    let stop_fraction: f64 = 0.005;      // 0.5 % stop‑loss used in the example
+
+    // ----- Compute each component (mirroring the tables) -----
+    let fkelly = f_kelly(lambda_frac, avg_win, avg_loss, ev_t);
+    let gvol = g_vol(atr_t, atr_ref, beta_vol);
+    let hconf = h_conf(phi_t, alpha_phi, phi_min);
+    let cmax = c_max(frisk, lmax, equity);
+    let qt = position_size_risk(
+        lambda_frac, avg_win, avg_loss, ev_t,
+        atr_t, atr_ref, beta_vol,
+        phi_t, alpha_phi, phi_min,
+        frisk, lmax, equity,
+    );
+
+    let notional = notional_from_risk(qt, stop_fraction);
+    let leverage_conservative = notional / equity;   // notional ÷ equity
+    // The prompt states: “Actual Leverage = 0.52 × (conservative)”
+    let actual_leverage = 0.52 * leverage_conservative;
+
+    // ----- Pretty‑print results (matching the example) -----
+    println!("--- Component values ---");
+    println!(
+        "fKelly  = {:.3}  ({:.1}% of max risk)",
+        fkelly,
+        fkelly * 100.0    );
+    println!("gVol    = {:.3}", gvol);
+    println!("hConf   = {:.3}", hconf);
+    println!("Cmax    = ${:.0}", cmax);
+    println!("Qt (risk) = ${:.2}", qt);
+    println!("Position notional = ${:.0}", notional);
+    println!(
+        "Leverage (conservative) = {:.2}×",
+        leverage_conservative
+    );
+    println!(
+        "Actual Leverage = 0.52 × (conservative) = {:.2}×",
+        actual_leverage
+    );
+
+    // ----- Simple sanity checks (optional) -----
+    // Expected from the example:
+    // fKelly≈0.507, gVol≈0.791, hConf≈0.650, Qt≈$260.50,
+    // notional≈$52,100, leverage≈0.52× (conservative)
+    assert!((fkelly - 0.507).abs() < 1e-3);
+    assert!((gvol - 0.791).abs() < 1e-3);
+    assert!((hconf - 0.650).abs() < 1e-3);
+    assert!((qt - 260.50).abs() < 1e-2);
+    assert!((notional - 52_100.0).abs() < 1e-2);
+}
