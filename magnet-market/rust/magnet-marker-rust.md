@@ -51,6 +51,23 @@ Key Changes:
         The final return statement combines the prices and weights using zip and map, multiplying corresponding elements to produce the final weighted prices.
 ---
 
+## hidden engine
+
+function soul_force into Rust. The original function computes the attractive force exerted by a latent "magnet" field, which is influenced by a gravitational constant ( G ) and an equilibrium price level ( eq ).
+Key Changes:
+
+    Function Signature:
+        In Rust, we specify the types of the parameters explicitly. Here, ptr is defined as a reference to a one-dimensional array of 64-bit floating-point numbers (&ndarray::Array1<f64>), while eq and G are both f64 types.
+
+    Return Type:
+        The return type is also specified as ndarray::Array1<f64>, indicating that the function will return a one-dimensional array of floating-point numbers.
+
+    Array Operations:
+        The operation ptr - eq is directly translated to Rust, leveraging the capabilities of the ndarray crate, which allows for element-wise operations similar to NumPy in Python.
+
+
+
+---
 ## windowed-extremum
 
 The provided Python code defines a function windowed_extremum that computes the sliding window maximum or minimum of a given array. The function takes a NumPy array, a window size, and a mode (either "max" or "min") as parameters. It returns a new array of the same shape as the input, with the first window-1 entries filled with NaN values.
