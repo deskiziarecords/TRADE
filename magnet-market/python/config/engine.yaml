@@ -1,0 +1,15 @@
+ipda:
+  windows: [20, 40, 60]
+  decay_rate: 0.15
+
+magnet:
+  attraction_exponent: 1.8
+  institutional_gravity: 0.72
+
+gamma:
+  feedback_beta: 0.45
+  crash_threshold: 3.2
+
+spectral:
+  fft_window: 128
+  misalign_alert: 0.35
