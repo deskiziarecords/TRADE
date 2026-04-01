@@ -30,7 +30,26 @@
 Each module exposes a **single public function** (or class) that returns a numeric signal you can plug into a back‑tester or execution engine.
 
 ---
+## Explicit component
 
+ The original function computes a decay-weighted pointer to a series of prices, where each price's relevance diminishes over time based on an exponential decay function.
+Key Changes:
+
+    Function Signature:
+        In Rust, we define the function with fn followed by the function name and parameters. The parameters are specified with their types, such as &[f64] for a slice of floating-point numbers and f64 for a single floating-point number.
+
+    Array Handling:
+        Python's np.ndarray is replaced with a Rust slice &[f64], which is a reference to a one-dimensional array of 64-bit floating-point numbers. The return type is a Vec<f64>, which is a dynamic array in Rust.
+
+    Age Calculation:
+        The age array is created using a range and reversed to mimic the behavior of np.arange(len(prices))[::-1]. In Rust, we use rev() to reverse the range.
+
+    Weight Calculation:
+        The weights are computed using an iterator that maps over the age vector, applying the exponential decay formula. The map function in Rust is similar to Python's list comprehensions.
+
+    Final Calculation:
+        The final return statement combines the prices and weights using zip and map, multiplying corresponding elements to produce the final weighted prices.
+---
 
 ## windowed-extremum
 
@@ -46,4 +65,7 @@ In the Rust version, we maintain the same functionality while adhering to Rust's
 
     Result Initialization: The result vector is initialized with NaN values using f64::NAN, which is the equivalent of NumPy's NaN in Rust.
 
-    Returning the Result: Finally, the function returns the result vector, which contains the computed extremum values aligned with the original input.
+    Returning the Result: Finally, the function returns the result vector, which contains the computed extremum values aligned with the original input.\
+
+---
+
