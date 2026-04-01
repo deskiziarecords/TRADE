@@ -103,4 +103,27 @@ In the Rust version, we maintain the same functionality while adhering to Rust's
     Returning the Result: Finally, the function returns the result vector, which contains the computed extremum values aligned with the original input.\
 
 ---
+## Potential Functions
+
+Function Signatures:
+
+    In Rust, we define functions using the pub fn syntax. The parameters are specified with their types, such as &Vec<f64> for a vector of 64-bit floating-point numbers and f64 for a single floating-point number.
+
+Vector Operations:
+
+    The Python code uses NumPy for vector operations, which is not directly available in Rust. Instead, we utilize Rust's iterator methods. The iter() method allows us to iterate over the elements of the vector, and map() applies a function to each element.
+
+Summation:
+
+    The summation of squared differences is achieved using map() to compute the square of each difference and sum() to aggregate the results. In Rust, we explicitly define the type of the variable sum to ensure type safety.
+
+Returning Values:
+
+    The potential function returns a single floating-point value, while the force function returns a vector of floating-point numbers. The collect() method is used to convert the iterator back into a vector.
+
+Default Parameters:
+
+    Rust does not support default parameters in the same way as Python. Therefore, you would need to overload the functions or provide a separate function to handle default values.
+
+
 
