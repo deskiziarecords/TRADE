@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import pandas_ta_tbb as ta
+import pandas_ta_openbb as ta
 import yfinance as yf
 from datetime import datetime, timedelta
 
