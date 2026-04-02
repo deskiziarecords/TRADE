@@ -1,0 +1,101 @@
+//@version=5
+// FIX #1: version directive is mandatory as the first line
+
+// ──────────────────────────────────────────────────────────────
+// 1️⃣ Kelly-adjusted EV weight
+// ──────────────────────────────────────────────────────────────
+f_kelly(lambda_frac, avg_win, avg_loss, ev_t) =>
+    ev_t > 0 ? lambda_frac * (avg_win * avg_loss) / ev_t : 0.0
+
+// ──────────────────────────────────────────────────────────────
+// 2️⃣ Volatility attenuation
+// ──────────────────────────────────────────────────────────────
+g_vol(atr_t, atr_ref, beta_vol) =>
+    // FIX #2: pow() → math.pow()
+    atr_t <= atr_ref ? 1.0 : math.pow(atr_ref / atr_t, beta_vol)
+
+// ──────────────────────────────────────────────────────────────
+// 3️⃣ Confluence modulation
+// ──────────────────────────────────────────────────────────────
+h_conf(phi_t, alpha_phi, phi_min) =>
+    // FIX #3: pow() → math.pow()
+    phi_t > phi_min ? math.pow(phi_t, alpha_phi) : 0.0
+
+// ──────────────────────────────────────────────────────────────
+// 4️⃣ Maximum capital at risk
+// ──────────────────────────────────────────────────────────────
+c_max(frisk, lmax, equity) =>
+    // FIX #4: min() → math.min()
+    math.min(frisk * equity, lmax * equity)
+
+// ──────────────────────────────────────────────────────────────
+// Core position-size formula
+// ──────────────────────────────────────────────────────────────
+position_size_risk(lambda_frac, avg_win, avg_loss, ev_t, atr_t, atr_ref, beta_vol, phi_t, alpha_phi, phi_min, frisk, lmax, equity) =>
+    fkelly = f_kelly(lambda_frac, avg_win, avg_loss, ev_t)
+    gvol   = g_vol(atr_t, atr_ref, beta_vol)
+    hconf  = h_conf(phi_t, alpha_phi, phi_min)
+    cmax   = c_max(frisk, lmax, equity)
+    fkelly * gvol * hconf * cmax
+
+// ──────────────────────────────────────────────────────────────
+// Helper: risk amount → notional position size
+// ──────────────────────────────────────────────────────────────
+notional_from_risk(risk_amount, stop_fraction) =>
+    risk_amount / stop_fraction
+
+// ──────────────────────────────────────────────────────────────
+// Demo – reproduces the verification numbers
+// ──────────────────────────────────────────────────────────────
+
+// FIX #5: study() → indicator()
+indicator("EV ATR Confluence", overlay=false)
+
+// FIX #9: use var so values are treated as true constants across bars
+var float equity         = 100000.0
+var float ev_t           = 0.0114
+var float atr_t          = 0.008
+var float atr_ref        = 0.005
+var float phi_t          = 0.75
+var float lambda_frac    = 3.0
+var float avg_win        = 0.015
+var float avg_loss       = 0.005
+var float beta_vol       = 0.5
+var float alpha_phi      = 1.5
+var float phi_min        = 0.60
+var float frisk          = 0.01
+var float lmax           = 50.0
+var float stop_fraction  = 0.005
+
+// Compute components
+fkelly = f_kelly(lambda_frac, avg_win, avg_loss, ev_t)
+gvol   = g_vol(atr_t, atr_ref, beta_vol)
+hconf  = h_conf(phi_t, alpha_phi, phi_min)
+cmax   = c_max(frisk, lmax, equity)
+qt     = position_size_risk(lambda_frac, avg_win, avg_loss, ev_t, atr_t, atr_ref,
+         beta_vol, phi_t, alpha_phi, phi_min, frisk, lmax, equity)
+
+notional             = notional_from_risk(qt, stop_fraction)
+leverage_conservative = notional / equity
+actual_leverage      = 0.52 * leverage_conservative
+
+// FIX #6: tostring() → str.tostring() (all 8 occurrences)
+// FIX #7: yloc=yloc.belowbar so y=na is handled correctly
+// FIX #8: only create labels on the last bar to avoid the 500-label limit
+if barstate.islast
+    label.new(bar_index, na, "fKelly  = "              + str.tostring(fkelly,               "#.###") + "  (" + str.tostring(fkelly * 100.0, "#.0") + "% of max risk)",
+              yloc=yloc.belowbar, style=label.style_label_up, color=color.blue, textcolor=color.white)
+    label.new(bar_index, na, "gVol    = "              + str.tostring(gvol,                 "#.###"),
+              yloc=yloc.belowbar, style=label.style_label_up, color=color.blue, textcolor=color.white)
+    label.new(bar_index, na, "hConf   = "              + str.tostring(hconf,                "#.###"),
+              yloc=yloc.belowbar, style=label.style_label_up, color=color.blue, textcolor=color.white)
+    label.new(bar_index, na, "Cmax    = $"             + str.tostring(cmax,                 "#.0"),
+              yloc=yloc.belowbar, style=label.style_label_up, color=color.blue, textcolor=color.white)
+    label.new(bar_index, na, "Qt (risk) = $"           + str.tostring(qt,                   "#.00"),
+              yloc=yloc.belowbar, style=label.style_label_up, color=color.blue, textcolor=color.white)
+    label.new(bar_index, na, "Position notional = $"   + str.tostring(notional,             "#.0"),
+              yloc=yloc.belowbar, style=label.style_label_up, color=color.blue, textcolor=color.white)
+    label.new(bar_index, na, "Leverage (conservative) = " + str.tostring(leverage_conservative, "#.00") + "×",
+              yloc=yloc.belowbar, style=label.style_label_up, color=color.blue, textcolor=color.white)
+    label.new(bar_index, na, "Actual Leverage = 0.52 × (conservative) = " + str.tostring(actual_leverage, "#.00") + "×",
+              yloc=yloc.belowbar, style=label.style_label_up, color=color.blue, textcolor=color.white)
