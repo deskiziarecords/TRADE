@@ -1,0 +1,10 @@
+[package]
+
+name = "position_sizing_rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+ndarray = "0.15"
+approx = "0.5"
