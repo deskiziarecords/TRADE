@@ -1,0 +1,151 @@
+[package]
+name = "ipda-trading-engine"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"  # Tokio LTS compatibility
+
+[dependencies]
+# ═══════════════════════════════════════════════════════════
+# ASYNC RUNTIME
+# ═══════════════════════════════════════════════════════════
+tokio = { version = "~1.43", features = [
+    "full",           # rt-multi-thread, net, time, fs, process, signal
+    "parking_lot",    # faster mutexes for high-frequency updates
+] }
+tokio-util = { version = "0.7", features = ["codec", "time"] }
+tokio-stream = "0.1"
+
+# ═══════════════════════════════════════════════════════════
+# DATA PIPELINE (Redis Streams for clean:ticks → jax:signals)
+# ═══════════════════════════════════════════════════════════
+redis = { version = "0.24", features = [
+    "tokio-comp",     # Tokio compatibility
+    "aio",            # Async API
+    "cluster-async",  # If using Redis Cluster
+    "streams",        # Redis Streams (XREAD/XADD)
+] }
+futures = "0.3"
+async-trait = "0.1"
+
+# ═══════════════════════════════════════════════════════════
+# DATABASE (SQLite for shadow fills + state persistence)
+# ═══════════════════════════════════════════════════════════
+sqlx = { version = "0.8", features = [
+    "sqlite",
+    "runtime-tokio",
+    "tls-rustls",
+    "migrate",        # For schema migrations
+    "chrono",
+] }
+async-sqlite = "0.3"  # Alternative: dedicated async SQLite wrapper
+
+# ═══════════════════════════════════════════════════════════
+# SERIALIZATION (Zero-copy where possible)
+# ═══════════════════════════════════════════════════════════
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "1.3"       # Fast binary serialization for IPC/state
+bytes = "1.5"         # Zero-copy byte buffers for tick data
+
+# ═══════════════════════════════════════════════════════════
+# FINANCIAL/STATS (Indicators: ATR, mean, std dev, vol)
+# ═══════════════════════════════════════════════════════════
+statrs = "0.16"       # Statistical distributions, ATR calculations
+rust_decimal = { version = "1.35", features = ["mathops"] }
+# OR time-series specific:
+# ta = "0.5"          # Technical analysis library (Wilder's ATR)
+
+# ═══════════════════════════════════════════════════════════
+# TIME & SCHEDULING (Kill zones: London + NY sessions)
+# ═══════════════════════════════════════════════════════════
+chrono = { version = "0.4", features = ["serde", "clock"] }
+chrono-tz = "0.9"     # Timezone handling for session gates
+cron = "0.12"         # Optional: cron-based scheduling
+
+# ═══════════════════════════════════════════════════════════
+# OBSERVABILITY (Critical for production trading)
+# ═══════════════════════════════════════════════════════════
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "fmt",
+    "json",           # Structured logging for ingestion
+    "parking_lot",
+] }
+tracing-appender = "0.2"  # Non-blocking log writing
+metrics = "0.23"
+metrics-exporter-prometheus = "0.14"
+
+# ═══════════════════════════════════════════════════════════
+# ERROR HANDLING & SAFETY
+# ═══════════════════════════════════════════════════════════
+thiserror = "1.0"
+anyhow = "1.0"
+parking_lot = "0.12"  # Faster synchronization primitives
+
+# ═══════════════════════════════════════════════════════════
+# CONFIGURATION
+# ═══════════════════════════════════════════════════════════
+config = "0.14"       # Hierarchical config (env + files)
+dotenvy = "0.15"      # .env file support
+
+# ═══════════════════════════════════════════════════════════
+# PERFORMANCE (Lock-free structures for tick ingestion)
+# ═══════════════════════════════════════════════════════════
+crossbeam = "0.8"     # Lock-free channels, queues
+dashmap = "5.5"       # Concurrent HashMap for state cache
+arc-swap = "1.7"      # Atomic pointer swapping for config
+
+# ═══════════════════════════════════════════════════════════
+# NETWORKING (WebSocket feeds, REST API for orders)
+# ═══════════════════════════════════════════════════════════
+tokio-tungstenite = { version = "0.24", features = ["rustls"] }
+reqwest = { version = "0.12", features = [
+    "json",
+    "rustls-tls",
+    "http2",
+    "stream",
+], default-features = false }
+
+[dev-dependencies]
+# ═══════════════════════════════════════════════════════════
+# TESTING FRAMEWORK
+# ═══════════════════════════════════════════════════════════
+tokio-test = "0.4"
+rstest = { version = "0.23", features = ["async-timeout"] }
+criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+
+# Test containers for integration tests
+testcontainers = "0.23"
+testcontainers-modules = { version = "0.11", features = ["redis", "postgres"] }
+
+# Property-based testing for financial calculations
+proptest = "1.5"
+approx = "0.5"        # Floating point comparisons
+
+# Mocking external services
+mockall = "0.12"
+wiremock = "0.6"      # HTTP mocking for exchange APIs
+
+# Tracing in tests
+tracing-test = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
+split-debuginfo = "unpacked"
+
+[[bench]]
+name = "tick_ingestion"
+harness = false
+
+[[bench]]
+name = "signal_latency"
+harness = false
