@@ -1,0 +1,65 @@
+//@version=5
+indicator(title="Stochastic RSI", shorttitle="Stoch RSI", format=format.price, precision=2,max_lines_count=500) 
+
+//STANDARD STOCHASTIC RSI CODE
+ema_rule = true
+smoothK = input.int(3, "K", minval=1)
+smoothD = input.int(3, "D", minval=1)
+lengthRSI = input.int(8, "RSI Length", minval=1)
+lengthStoch = input.int(8, "Stochastic Length", minval=1)
+src = input(close, title="RSI Source")
+rsi1 = ta.rsi(src, lengthRSI)
+k = ta.sma(ta.stoch(rsi1, rsi1, rsi1, lengthStoch), smoothK)
+d = ta.sma(k, smoothD)
+// END OF STANDARD STOCHASTIC RSI CODE
+
+ema200=ta.ema(close,200)
+
+signalvalidity=input.int(3,title="# valid bars",minval=1,maxval=3,tooltip="Number of bars that crossover or crossunder-signals are considered valid")
+linewidth=input.int(5,minval=1)
+crossoverlimit=input.int(50,minval=0, maxval=100,tooltip="Signal appears when crossover (up) happens under this value. Default is 50")
+crossunderlimit=input.int(50,minval=0, maxval=100,tooltip="Signal appears when crossunder(down) happens above this value. Default is 50")
+
+crossover=ta.crossover(k,d) and (k<crossoverlimit or k[1]<crossoverlimit)
+//K-line after the cross, or just before the cross, must be below the set tresholdvalue  i.e. 50
+//can be improved by claculating the exact cross!!
+crossunder=ta.crossunder(k,d) and (k>crossunderlimit or k[1]>crossunderlimit)
+//K-line after the cross, or just before the cross, must be above the set tresholdvalue  i.e. 50
+//can be improved by claculating the exact cross!!
+
+
+plotshape(crossover,style= shape.cross,location=location.bottom, color=color.green)
+if crossover
+    line.new(bar_index, 100, bar_index, 0, width = linewidth,color=color.new(color.green,50))
+    line.new(bar_index, 30, bar_index, 0, width = linewidth,color=color.new(color.green,0))
+    
+if crossover[1] and signalvalidity>1
+    line.new(bar_index, 100, bar_index, 0, width = linewidth,color=color.new(color.green,50))
+if crossover[2] and signalvalidity>2
+    line.new(bar_index, 100, bar_index, 0, width = linewidth,color=color.new(color.green,50))
+
+
+plotshape(crossunder,style= shape.cross,location=location.bottom, color=color.red)
+if crossunder
+    line.new(bar_index, 100, bar_index, 0, width = linewidth,color=color.new(color.red,50))
+    line.new(bar_index, 100, bar_index, 70, width = linewidth,color=color.new(color.red,0))
+
+if crossunder[1] and signalvalidity>1
+    line.new(bar_index, 100, bar_index, 0, width = linewidth,color=color.new(color.red,50))
+if crossunder[2] and signalvalidity>2
+    line.new(bar_index, 100, bar_index, 0, width = linewidth,color=color.new(color.red,50))
+
+alertcondition(crossunder, title='Bearish cross', message='Bearish Cross on StochRSI!')
+alertcondition(crossover, title='Bullish cross', message='Bullish Cross on StochRSI!')
+alertcondition(crossunder and close<open, title='Bearish cross + Red candle', message='Bearish Cross on StochRSI + Red Candle')
+alertcondition(crossover and close>open, title='Bullish cross + Green Candle', message='Bullish Cross on StochRSI! + Green Candle')
+
+//SECOND PART OF STANDARD STOCHASTIC RSI CODE
+plot(k, "K", color=color.yellow,linewidth=2)
+plot(d, "D", color=color.red,linewidth=2)
+h0 = hline(80, "Upper Band", color=#787B86)
+hline(50, "Middle Band", color=color.new(#787B86, 50))
+h1 = hline(20, "Lower Band", color=#787B86)
+fill(h0, h1, color=color.rgb(33, 150, 243, 90), title="Background")
+//END OF SECOND PART OF STANDARD STOCHASTIC RSI CODE
+
