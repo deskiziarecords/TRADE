@@ -1,0 +1,121 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © ClassicScott
+
+//@version=6
+indicator('+ Stochastic S/R Zones', shorttitle = '+ StochS/R', overlay = true)
+
+
+//----- Stochastic Inputs
+choose     = input.string(title = 'Type', defval = 'Stochastic', options = ['Stochastic', 'Stochastic RSI'])
+src        = input       (title = 'Source', defval = close)
+periodK    = input.int   (title = '%K', defval = 13)
+smoothK    = input.int   (title = '%K Smoothing', defval = 3)
+periodD    = input.int   (title = '%D', defval = 3)
+periodRSI  = input.int   (title = "RSI Period", defval = 14)
+obLevel    = input       (title = 'Overbought Level', defval = 80)
+osLevel    = input       (title = 'Oversold Level', defval = 20)
+zoneSource = input.string(title = 'Source for Zones', defval = '%K', options = ['%K', '%D'], tooltip = 'Select the %K line or %D line to determine when a zone should be highlighted. Remember, %D, being the signal line, is smoother, but slower.')
+barColor   = input.bool  (title = 'Bar Color', defval = true, tooltip = 'Colors the bar on which the Stochastic crosses its 50 line, if selected.')
+shapes     = input.bool  (title = 'Shapes', defval=false, tooltip = 'Plots shapes above or below the bar on which the Stochastic crosses its 50 line, if selected.')
+
+
+//----- Stochastic and stochastic rsi calculation
+rsi = ta.rsi(src, periodRSI)
+k   = choose == 'Stochastic' ? ta.sma(ta.stoch(src, high, low, periodK), smoothK) : ta.sma(ta.stoch(rsi, rsi, rsi, periodK), smoothK)
+d   = ta.sma(k, periodD)
+
+
+//----- Variables specific to box functionality (Stochastic crossing out of overbought or oversold)
+kCrossOverOS  = ta.crossover (k, osLevel)
+dCrossOverOS  = ta.crossover (d, osLevel)
+kCrossUnderOB = ta.crossunder(k, obLevel)
+dCrossUnderOB = ta.crossunder(d, obLevel)
+
+stochCrossOverOS  = zoneSource == '%K' and kCrossOverOS  or zoneSource == '%D' and dCrossOverOS
+stochCrossUnderOB = zoneSource == '%K' and kCrossUnderOB or zoneSource == '%D' and dCrossUnderOB
+
+
+//----- Variables specific to bar color and shapes (Stochastic crossing the 50 level)
+kCrossOver50  = ta.crossover (k, 50)
+dCrossOver50  = ta.crossover (d, 50)
+kCrossUnder50 = ta.crossunder(k, 50)
+dCrossUnder50 = ta.crossunder(d, 50)
+
+stochCrossOver50  = zoneSource == '%K' and kCrossOver50  or zoneSource == '%D' and dCrossOver50
+stochCrossUnder50 = zoneSource == '%K' and kCrossUnder50 or zoneSource == '%D' and dCrossUnder50
+
+
+//----- Support box
+supportStyle = input.string(title = 'Border Style', defval = 'Dotted', options = ['Solid', 'Dotted', 'Dashed'], group = 'Support Zones')
+supportWidth = input.int   (title = 'Border Width', defval = 1, maxval = 4, group = 'Support Zones')
+supportColor = input.color (title = 'Border Color', defval = color.new(#445b84, 20), group = 'Support Zones')
+supportFill  = input.color (title = 'Fill Color',   defval = color.new(#445b84, 85), group = 'Support Zones')
+
+supportBorderStyle = supportStyle == 'Solid' ? line.style_solid : supportStyle == 'Dotted' ? line.style_dotted : supportStyle == 'Dashed' ? line.style_dashed : na
+
+var supportBox = array.new_box()
+var supportLow = array.new_float()
+
+if stochCrossOverOS
+    array.push(supportLow, low[1])
+    array.push(supportBox, box.new(bar_index[1], high[1], bar_index, low[1], xloc = xloc.bar_index, border_color = supportColor, border_style = supportBorderStyle, border_width = supportWidth, bgcolor = supportFill))
+
+if (array.size(supportBox) > 0)
+    for i = 0 to array.size(supportBox) - 1
+        activeSupportBox = array.get(supportBox, i)
+        activeSupportBox.set_right(bar_index)
+
+if (array.size(supportLow) > 0)
+    for i = array.size(supportLow) - 1 to 0
+        boxLowPrice = array.get(supportLow, i)
+        if (close < boxLowPrice)
+            brokenSupportBox = array.get(supportBox, i)
+            brokenSupportBox.set_right(bar_index)
+            array.remove(supportLow, i)
+            array.remove(supportBox, i)
+
+
+//----- Resistance box
+resistanceStyle = input.string(title = 'Border Style', defval = 'Dotted', options = ['Solid', 'Dotted', 'Dashed'], group = 'Resistance Zones')
+resistanceWidth = input.int   (title = 'Border Width', defval = 1, maxval = 4, group = 'Resistance Zones')
+resistanceColor = input.color (title = 'Border Color', defval = color.new(#844444, 20), group = 'Resistance Zones')
+resistanceFill  = input.color (title = 'Fill Color',   defval = color.new(#844444, 85), group = 'Resistance Zones')
+
+resistanceBorderStyle = resistanceStyle == 'Solid' ? line.style_solid : resistanceStyle == 'Dotted' ? line.style_dotted : resistanceStyle == 'Dashed' ? line.style_dashed : na
+
+var resistanceBox  = array.new_box()
+var resistanceHigh = array.new_float()
+
+if stochCrossUnderOB
+    array.push(resistanceHigh, high[1])
+    array.push(resistanceBox, box.new(bar_index[1], high[1], bar_index, low[1], xloc = xloc.bar_index, border_color = resistanceColor, border_style = resistanceBorderStyle, border_width = resistanceWidth, bgcolor = resistanceFill))
+
+if (array.size(resistanceBox) > 0)
+    for i = 0 to array.size(resistanceBox) - 1
+        activeresistanceBox = array.get(resistanceBox, i)
+        activeresistanceBox.set_right(bar_index)
+
+if (array.size(resistanceHigh) > 0)
+    for i = array.size(resistanceHigh) - 1 to 0
+        boxHighPrice = array.get(resistanceHigh, i)
+        if (close > boxHighPrice)
+            brokenresistanceBox = array.get(resistanceBox, i)
+            brokenresistanceBox.set_right(bar_index)
+            array.remove(resistanceHigh, i)
+            array.remove(resistanceBox, i)
+
+
+//----- Bar color and shapes
+plotshape(title = 'Cross Up',   series = shapes and stochCrossOver50,  style = shape.circle, location = location.belowbar, color = #448484)
+plotshape(title = 'Cross Down', series = shapes and stochCrossUnder50, style = shape.circle, location = location.abovebar, color = #5a4484)
+barcolor(color = barColor and stochCrossOver50 ? color.new(#448484, 0) : barColor and stochCrossUnder50 ? color.new(#5a4484, 0) : na)
+
+
+//----- Alerts
+alertcondition(ta.cross(k, d), '%K Crossing %D', 'The stochastic %K has crossed the %D.')
+
+alertcondition(stochCrossOver50 or stochCrossUnder50, 'Stochastic Crossing 50', 'The stochastic has crossed 50.')
+
+alertcondition(stochCrossOverOS,  'Stochastic Crossing over Oversold', 'The stochastic has crossed out of oversold.')
+alertcondition(stochCrossUnderOB, 'Stochastic Crossing under Overbought', 'The stochastic has crossed out of overbought.')
+
