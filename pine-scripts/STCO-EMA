@@ -1,0 +1,112 @@
+//@version=6
+indicator("StochasticEMAv3", overlay=true, max_bars_back=1000)
+
+// --- TAB 1: STOCHASTICS CONFIGURATION ---
+gp_s = "Stochastic Settings"
+s1_len = input.int(14, "Stoch 1: Length", group=gp_s, inline="s1")
+s1_k   = input.int(3, "K", group=gp_s, inline="s1")
+s1_d   = input.int(3, "D", group=gp_s, inline="s1")
+
+s2_len = input.int(21, "Stoch 2: Length", group=gp_s, inline="s2")
+s2_k   = input.int(3, "K", group=gp_s, inline="s2")
+s2_d   = input.int(3, "D", group=gp_s, inline="s2")
+
+s3_len = input.int(50, "Stoch 3: Length", group=gp_s, inline="s3")
+s3_k   = input.int(3, "K", group=gp_s, inline="s3")
+s3_d   = input.int(3, "D", group=gp_s, inline="s3")
+
+s4_len = input.int(100, "Stoch 4: Length", group=gp_s, inline="s4")
+s4_k   = input.int(3, "K", group=gp_s, inline="s4")
+s4_d   = input.int(3, "D", group=gp_s, inline="s4")
+
+// --- TAB 2: MOVING AVERAGES CONFIGURATION ---
+gp_m = "Moving Average Settings"
+ma1_len = input.int(20, "MA 1 Length", group=gp_m)
+ma2_len = input.int(50, "MA 2 Length", group=gp_m)
+ma3_len = input.int(100, "MA 3 Length", group=gp_m)
+ma4_len = input.int(200, "MA 4 Length", group=gp_m)
+
+// --- TAB 3: SWING & ZONE SETTINGS ---
+gp_sw = "Swing & Divergence Logic"
+pivot_len = input.int(5, "Pivot Detection Period", minval=1, group=gp_sw, tooltip="Bars required on each side to confirm a High/Low point.")
+div_lookback = input.int(1, "Divergence Lookback (Pivots)", minval=1, maxval=5, group=gp_sw, tooltip="Compare the current pivot to which previous pivot? (1 = the most recent one)")
+
+ob_level = input.int(80, "Overbought Level", minval=50, maxval=100, group=gp_sw)
+os_level = input.int(20, "Oversold Level", minval=0, maxval=50, group=gp_sw)
+
+// --- CALCULATIONS ---
+f_stoch_d(len, k, d) =>
+    st_k = ta.sma(ta.stoch(close, high, low, len), k)
+    ta.sma(st_k, d)
+
+st1_d = f_stoch_d(s1_len, s1_k, s1_d)
+st2_d = f_stoch_d(s2_len, s2_k, s2_d)
+st3_d = f_stoch_d(s3_len, s3_k, s3_d)
+st4_d = f_stoch_d(s4_len, s4_k, s4_d)
+
+// Plot MAs
+plot(ta.sma(close, ma1_len), color=color.gray, title="MA 1")
+plot(ta.sma(close, ma2_len), color=color.blue, title="MA 2")
+plot(ta.sma(close, ma3_len), color=color.orange, title="MA 3")
+plot(ta.sma(close, ma4_len), color=color.red, title="MA 4")
+
+// --- SWING IDENTIFICATION ---
+ph = ta.pivothigh(high, pivot_len, pivot_len)
+pl = ta.pivotlow(low, pivot_len, pivot_len)
+
+high_line = fixnan(ph)
+low_line  = fixnan(pl)
+
+plot(high_line, color=color.new(color.red, 50), style=plot.style_linebr, title="Swing High Line")
+plot(low_line, color=color.new(color.green, 50), style=plot.style_linebr, title="Swing Low Line")
+
+// --- DIVERGENCE LOGIC (SEPARATED) ---
+// Find price at the previous confirmed pivot
+last_low_price = ta.valuewhen(not na(pl), low[pivot_len], div_lookback)
+last_high_price = ta.valuewhen(not na(ph), high[pivot_len], div_lookback)
+
+f_check_div(osc_d) =>
+    // Find oscillator value at the previous confirmed pivot
+    prev_osc_low = ta.valuewhen(not na(pl), osc_d[pivot_len], div_lookback)
+    prev_osc_high = ta.valuewhen(not na(ph), osc_d[pivot_len], div_lookback)
+    
+    bool bull_n = false, bool bull_h = false
+    bool bear_n = false, bool bear_h = false
+    
+    if not na(pl)
+        // Current pivot low vs the chosen previous pivot low
+        bull_n := low[pivot_len] < last_low_price and osc_d[pivot_len] > prev_osc_low
+        bull_h := low[pivot_len] > last_low_price and osc_d[pivot_len] < prev_osc_low
+
+    if not na(ph)
+        // Current pivot high vs the chosen previous pivot high
+        bear_n := high[pivot_len] > last_high_price and osc_d[pivot_len] < prev_osc_high
+        bear_h := high[pivot_len] < last_high_price and osc_d[pivot_len] > prev_osc_high
+    
+    [bull_n, bull_h, bear_n, bear_h]
+
+// Evaluate all 4 stochastics
+[b1n, b1h, r1n, r1h] = f_check_div(st1_d)
+[b2n, b2h, r2n, r2h] = f_check_div(st2_d)
+[b3n, b3h, r3n, r3h] = f_check_div(st3_d)
+[b4n, b4h, r4n, r4h] = f_check_div(st4_d)
+
+// --- PLOTTING ---
+f_draw_label(cond_n, cond_h, is_bull) =>
+    if cond_n
+        label.new(bar_index[pivot_len], is_bull ? low[pivot_len] : high[pivot_len], "N", color=is_bull ? color.green : color.red, textcolor=color.white, style=is_bull ? label.style_label_up : label.style_label_down)
+    //if cond_h
+        //label.new(bar_index[pivot_len], is_bull ? low[pivot_len] : high[pivot_len], "H", color=is_bull ? color.green : color.red, textcolor=color.white, style=is_bull ? label.style_label_up : label.style_label_down)
+
+f_draw_label(b1n or b2n or b3n or b4n, b1h or b2h or b3h or b4h, true)
+f_draw_label(r1n or r2n or r3n or r4n, r1h or r2h or r3h or r4h, false)
+
+// Background Logic
+st_all_below_os = st1_d[pivot_len] < os_level and st2_d[pivot_len] < os_level and st3_d[pivot_len] < os_level and st4_d[pivot_len] < os_level
+st_all_above_ob = st1_d[pivot_len] > ob_level and st2_d[pivot_len] > ob_level and st3_d[pivot_len] > ob_level and st4_d[pivot_len] > ob_level
+
+any_bull_div = b1n or b1h or b2n or b2h or b3n or b3h or b4n or b4h
+any_bear_div = r1n or r1h or r2n or r2h or r3n or r3h or r4n or r4h
+
+bgcolor(any_bull_div and st_all_below_os ? color.new(color.lime, 70) : na)
+bgcolor(any_bear_div and st_all_above_ob ? color.new(color.red, 70) : na)
